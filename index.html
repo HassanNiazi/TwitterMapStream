@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<!-- TODO : Replce your api key in maps script tag @ YOUR_API_KEY -->
+
+<head>
+    <script src="https://code.jquery.com/jquery-3.1.1.min.js" integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8=" crossorigin="anonymous"></script>
+    <script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap"></script>
+
+    <style>
+        #map {
+            height: 97.5vh;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <button id="refresh" style="float: right;position:relative;background-color:white">Refresh</button>
+    <!-- <button id="clearMarkers" style="float: right;position:relative;background-color:white">Clear Markers</button> -->
+    <div id="map" style="position:absolute;left:0;right:0;z-index:-1"></div>
+    <script>
+        var _map;
+        var rectangle;
+        var infoWindow;
+        var socket = io.connect('http://localhost:3000');
+        var markers = [];
+        var newCoords
+        jQuery('#refresh').click(function() {
+            if (newCoords)
+                socket.emit('newCoords', newCoords);
+        });
+
+        function initMap() {
+            var uluru = {
+                lat: 25,
+                lng: 50
+            };
+            _map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 2,
+                center: uluru
+            });
+
+            var bounds = {
+                north: 50.599,
+                south: 25.490,
+                east: -25.443,
+                west: -50.649
+            };
+
+            rectangle = new google.maps.Rectangle({
+                bounds: bounds,
+                editable: true,
+                draggable: true
+            });
+
+            rectangle.setMap(_map);
+
+            rectangle.addListener('bounds_changed', showNewRect);
+
+            infoWindow = new google.maps.InfoWindow();
+
+        }
+
+        function showNewRect(event) {
+            var ne = rectangle.getBounds().getNorthEast();
+            var sw = rectangle.getBounds().getSouthWest();
+
+            var contentString = '<b>Rectangle moved.</b><br>' +
+                'New north-east corner: ' + ne.lat() + ', ' + ne.lng() + '<br>' +
+                'New south-west corner: ' + sw.lat() + ', ' + sw.lng();
+
+            infoWindow.setContent(contentString);
+            infoWindow.setPosition(ne);
+            infoWindow.open(_map);
+            newCoords = {
+                northEast: {
+                    lat: ne.lat(),
+                    lng: ne.lng()
+                },
+                southWest: {
+                    lat: sw.lat(),
+                    lng: sw.lng()
+                }
+            };
+            console.log(newCoords);
+            clearMarkers();
+        }
+
+        function addMarker(_lat, _lng) {
+            markers.push(new google.maps.Marker({
+                position: new google.maps.LatLng(_lat, _lng),
+                map: _map,
+                draggable: true
+            }));
+
+        }
+
+        function clearMarkers() {
+            console.log(markers.length);
+            for (var i = 0; i < markers.length; i++) {
+                markers[i].setMap(null);
+            }
+            markers = [];
+        }
+
+
+        socket.on('newTweet', function(tweet) {
+            if (tweet.coordinates.coordinates != null && map != null) {
+                var coord = tweet.coordinates.coordinates
+                // console.log(tweet.id);
+                var _marker = new google.maps.Marker({
+
+                    position: new google.maps.LatLng(coord[1], coord[0]),
+                    map: _map,
+                    draggable: true
+                });
+                markers.push(_marker);
+
+            } else {
+                console.log('coordinates are null');
+            }
+        });
+    </script>
+
+</body>
+
+</html>
